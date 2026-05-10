@@ -34,9 +34,16 @@ const programInfo = createProgramInfo(gl, [vsSource, fsSource]);
 
 // --- CRIAÇÃO DOS OBJETOS 3D ---
 // Chão (Plane): O "10, 10" no final significa poucas subdivisões (ideal para low-poly!)
-const chaoBuffer = primitives.createPlaneBufferInfo(gl, 100, 100, 10, 10);
-// Nave (Cubo): A forma mais simples possível para começarmos
-const naveBuffer = primitives.createCubeBufferInfo(gl, 2); 
+const chaoBuffer = primitives.createPlaneBufferInfo(gl, 200, 200, 10, 10);
+
+// --- CRIAÇÃO DO OVNI ---
+// 1. Corpo/Chassi:
+const corpoOvniBuffer = primitives.createTruncatedConeBufferInfo(gl, 2.3, 2, 0.5, 20, 1);
+// 2. Cabine : 
+const cabineOvniBuffer = primitives.createSphereBufferInfo(gl, 1.5, 30, 30);
+// 3. Anel :
+const anelOvniBuffer = primitives.createTorusBufferInfo(gl, 3.5, 0.2, 10, 12);
+
 // Árvore (Low-poly)
 const troncoBuffer = primitives.createCylinderBufferInfo(gl, 0.5, 2, 6, 1); // Raio 0.5, Altura 2
 const folhasBuffer = primitives.createTruncatedConeBufferInfo(gl, 2, 0, 3, 6, 1); // Raio base 2, topo 0, Altura 3
@@ -70,7 +77,7 @@ const profundidadeVisao = 120;
 
 for(let i = 0; i < quantidadeArvores; i++){
         arvores.push({
-        x : (Math.random() - 0.5) * 50, // Distribuição aleatória no eixo X
+        x : (Math.random() - 0.5) * 100, // Distribuição aleatória no eixo X
         z : -Math.random() * profundidadeVisao // Distribuição aleatória no eixo Z, mais próximas da nave
     });
 }
@@ -93,7 +100,7 @@ function render(time) {
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     const projection = m4.perspective(fov, aspect, 0.1, 200);
 
-    const offset = [10, 20, 0];
+    const offset = [10, 8, 0];
     const cameraPosition = [
         navePos[0] + offset[0],
         navePos[1] + offset[1],
@@ -129,36 +136,41 @@ function render(time) {
         criarArvore(viewProjection, arvore.x, arvore.z);
     }
 
-    // --- DESENHAR A NAVE ---
-    // A nave avança no eixo Z
-    let matrixNave = m4.translation(navePos);
-    let finalMatrixNave = m4.multiply(viewProjection, matrixNave);
+    // --- DESENHAR O OVNI ---
+    //Controla a posição global do OVNI no mundo
+    let matrizBaseOvni = m4.translation(navePos);
+    //Leve inclinação para parecer que está voando
+    matrizBaseOvni = m4.rotateZ(matrizBaseOvni, Math.sin(time*2) * 0.05);
 
-    setBuffersAndAttributes(gl, programInfo, naveBuffer);
+    // Desenhar o corpo
+    let finalMatrixCorpo = m4.multiply(viewProjection, matrizBaseOvni);
+    setBuffersAndAttributes(gl, programInfo, corpoOvniBuffer);
     setUniforms(programInfo, {
-        u_worldViewProjection: finalMatrixNave,
-        u_color: [0.9, 0.3, 0.2, 1], // Vermelho
+        u_worldViewProjection: finalMatrixCorpo,
+        u_color: [0.6, 0.6, 0.6, 1], // Cinza
     });
-    drawBufferInfo(gl, naveBuffer);
+    drawBufferInfo(gl, corpoOvniBuffer);
 
-    // --- DESENHAR ELEMENTOS RODEANDO A NAVE ---
-    let numElementos = 7;
-    for (let i = 0; i < numElementos; i++) {
-        let angle = (i / numElementos) * 2 * Math.PI;
-        let radius = 3;
-        let x = Math.cos(angle + time) * radius;
-        let z = Math.sin(angle + time) * radius + navePos[2];
-        let y = 5; // Altura constante
-        let matrixElemento = m4.translation([x, y, z]);
-        matrixElemento = m4.rotateY(matrixElemento, time + angle);
-        matrixElemento = m4.scale(matrixElemento, [0.5, 0.5, 0.5]);
-        let finalMatrixElemento = m4.multiply(viewProjection, matrixElemento);
-        setUniforms(programInfo, {
-            u_worldViewProjection: finalMatrixElemento,
-            u_color: [0.2, 0.5, 0.9, 1], // Azul
-        });
-        drawBufferInfo(gl, naveBuffer);
-    }
+    // Desenhar a cabine
+    let matrizCabine = m4.translate(matrizBaseOvni, [0, 0.8, 0]);
+    let finalMatrixCabine = m4.multiply(viewProjection, matrizCabine);
+    setBuffersAndAttributes(gl, programInfo, cabineOvniBuffer);
+    setUniforms(programInfo, {
+        u_worldViewProjection: finalMatrixCabine,
+        u_color: [0.2, 0.8, 0.8, 1], // Ciano
+    });
+    drawBufferInfo(gl, cabineOvniBuffer);
+
+    // Desenhar o anel
+    let matrizAnel = m4.rotateY(matrizBaseOvni, time*5);
+    matrizAnel = m4.rotateZ(matrizAnel, 0.05);
+    let finalMatrixAnel = m4.multiply(viewProjection, matrizAnel);
+    setBuffersAndAttributes(gl, programInfo, anelOvniBuffer);
+    setUniforms(programInfo, {
+        u_worldViewProjection: finalMatrixAnel,
+        u_color: [0.1, 0.9, 0.2, 1], // Verde neon
+    });
+    drawBufferInfo(gl, anelOvniBuffer);
 
     requestAnimationFrame(render);
 }
