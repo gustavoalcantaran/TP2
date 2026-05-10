@@ -1,0 +1,16 @@
+/* Reseta as margens padrão do navegador */
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Esconde barras de rolagem */
+    background-color: #87CEEB; /* Cor de fundo (um azul céu) */
+}
+
+/* Faz o canvas ocupar 100% da tela */
+#gameCanvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+}
