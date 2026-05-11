@@ -84,9 +84,11 @@ for(let i = 0; i < quantidadeArvores; i++){
 
 
 // --- CONFIGURAÇÃO DA NAVE ---
-let navePos = [0,10,0];
+let navePos = [0,7,0];
 let tempoAnterior = 0;
 const velocidadeOvni = 20;
+let inclinacaoAtualX = 0;
+let inclinacaoAtualZ = 0;
 
 // --- LEITURA DE TECLAS ---
 const teclasPressionadas = {};
@@ -118,25 +120,36 @@ function render(time) {
     gl.useProgram(programInfo.program);
 
     // --- Controles de voo ---
+    let inclinacaoAlvoX = 0;
+    let inclinacaoAlvoZ = 0;
+
     if(teclasPressionadas['w'] == true || teclasPressionadas['arrowup']){
         navePos[2] -= velocidadeOvni * deltaTime;
+        inclinacaoAlvoX = -0.3; // Inclina para frente
     }
     if(teclasPressionadas['s'] == true || teclasPressionadas['arrowdown']){
         navePos[2] += velocidadeOvni * deltaTime;
+        inclinacaoAlvoX = 0.3; // Inclina para trás
     }
     if(teclasPressionadas['a'] == true || teclasPressionadas['arrowleft']){
         navePos[0] -= velocidadeOvni * deltaTime;
+        inclinacaoAlvoZ = 0.3; // Inclina para a esquerda
     }
     if(teclasPressionadas['d'] == true || teclasPressionadas['arrowright']){
         navePos[0] += velocidadeOvni * deltaTime;
+        inclinacaoAlvoZ = -0.3; // Inclina para a direita
     }
+
+    //Suavização das inclinações
+    inclinacaoAtualX += (inclinacaoAlvoX - inclinacaoAtualX) * deltaTime * 5;
+    inclinacaoAtualZ += (inclinacaoAlvoZ - inclinacaoAtualZ) * deltaTime * 5;
 
     // --- CÂMERA E PROJEÇÃO ---
     const fov = 60 * Math.PI / 180;
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     const projection = m4.perspective(fov, aspect, 0.1, 200);
 
-    const offset = [0, 10, 15];
+    const offset = [0, 5, 10];
     const cameraPosition = [
         navePos[0] + offset[0],
         navePos[1] + offset[1],
@@ -177,7 +190,9 @@ function render(time) {
     //Controla a posição global do OVNI no mundo
     let matrizBaseOvni = m4.translation(navePos);
     //Leve inclinação para parecer que está voando
-    matrizBaseOvni = m4.rotateZ(matrizBaseOvni, Math.sin(time*2) * 0.05);
+    matrizBaseOvni = m4.rotateX(matrizBaseOvni, inclinacaoAtualX);
+    matrizBaseOvni = m4.rotateZ(matrizBaseOvni, inclinacaoAtualZ);
+    matrizBaseOvni = m4.rotateY(matrizBaseOvni, Math.sin(time * 2) * 0.05);
 
     // Desenhar o corpo
     let finalMatrixCorpo = m4.multiply(viewProjection, matrizBaseOvni);
