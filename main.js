@@ -82,10 +82,32 @@ for(let i = 0; i < quantidadeArvores; i++){
     });
 }
 
+
+// --- CONFIGURAÇÃO DA NAVE ---
+let navePos = [0,10,0];
+let tempoAnterior = 0;
+const velocidadeOvni = 20;
+
+// --- LEITURA DE TECLAS ---
+const teclasPressionadas = {};
+window.addEventListener('keydown',(e)=>{
+teclasPressionadas[e.key.toLowerCase()] = true;
+if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.key) > -1) {
+        e.preventDefault();
+    }
+})
+
+window.addEventListener('keyup',(e)=>{
+teclasPressionadas[e.key.toLowerCase()] = false;
+})
+
 // --- GAME LOOP ---
 function render(time) {
     time *= 0.001; // Converte o tempo para segundos
-    const navePos = [0, 5, (-time * 15)/4];
+    const deltaTime = time - tempoAnterior;
+    tempoAnterior = time;
+
+    
     // Ajusta o tamanho do canvas para não ficar borrado
     resizeCanvasToDisplaySize(gl.canvas);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -95,12 +117,26 @@ function render(time) {
 
     gl.useProgram(programInfo.program);
 
+    // --- Controles de voo ---
+    if(teclasPressionadas['w'] == true || teclasPressionadas['arrowup']){
+        navePos[2] -= velocidadeOvni * deltaTime;
+    }
+    if(teclasPressionadas['s'] == true || teclasPressionadas['arrowdown']){
+        navePos[2] += velocidadeOvni * deltaTime;
+    }
+    if(teclasPressionadas['a'] == true || teclasPressionadas['arrowleft']){
+        navePos[0] -= velocidadeOvni * deltaTime;
+    }
+    if(teclasPressionadas['d'] == true || teclasPressionadas['arrowright']){
+        navePos[0] += velocidadeOvni * deltaTime;
+    }
+
     // --- CÂMERA E PROJEÇÃO ---
     const fov = 60 * Math.PI / 180;
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     const projection = m4.perspective(fov, aspect, 0.1, 200);
 
-    const offset = [10, 8, 0];
+    const offset = [0, 10, 15];
     const cameraPosition = [
         navePos[0] + offset[0],
         navePos[1] + offset[1],
@@ -116,7 +152,8 @@ function render(time) {
     // --- DESENHAR O CHÃO ---
     const tamanhoPoligono = 10;
     const chaoZ = Math.round(navePos[2]/tamanhoPoligono) * tamanhoPoligono;
-    let matrixChao = m4.translation([0, 0, chaoZ]);
+    const chaoX = Math.round(navePos[0]/tamanhoPoligono) * tamanhoPoligono;
+    let matrixChao = m4.translation([chaoX, 0, chaoZ]);
     let finalMatrixChao = m4.multiply(viewProjection, matrixChao);
     
     setBuffersAndAttributes(gl, programInfo, chaoBuffer);
