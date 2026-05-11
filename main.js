@@ -177,10 +177,18 @@ function render(time) {
     drawBufferInfo(gl, chaoBuffer);
 
     // --- DESENHAR AS ÁRVORES ---
+    const limiteTras = 20;
+    const limiteFrente = profundidadeVisao;
+    const tamanhoTotal = limiteFrente + limiteTras;
     const posCameraZ = cameraPosition[2];
+
     for (let arvore of arvores){
-        if(arvore.z > posCameraZ + 30){
-            arvore.z = posCameraZ - profundidadeVisao; // Reposiciona a árvore para trás da visão
+        if(arvore.z > posCameraZ + limiteTras){
+            arvore.z -= tamanhoTotal; // Reposiciona a árvore para trás da visão
+            arvore.x = (Math.random() - 0.5) * 200; // Nova posição X aleatória
+        }
+        else if (arvore.z < posCameraZ - limiteFrente){
+            arvore.z += tamanhoTotal; // Reposiciona a árvore para frente da visão
             arvore.x = (Math.random() - 0.5) * 200; // Nova posição X aleatória
         }
         criarArvore(viewProjection, arvore.x, arvore.z);
