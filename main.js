@@ -90,6 +90,9 @@ const velocidadeOvni = 20;
 let inclinacaoAtualX = 0;
 let inclinacaoAtualZ = 0;
 
+// --- CONFIGURAÇÃO DE CÂMERA ---
+let cameraAtual = 2;
+
 // --- LEITURA DE TECLAS ---
 const teclasPressionadas = {};
 window.addEventListener('keydown',(e)=>{
@@ -140,24 +143,44 @@ function render(time) {
         inclinacaoAlvoZ = -0.3; // Inclina para a direita
     }
 
+    
     //Suavização das inclinações
     inclinacaoAtualX += (inclinacaoAlvoX - inclinacaoAtualX) * deltaTime * 5;
     inclinacaoAtualZ += (inclinacaoAlvoZ - inclinacaoAtualZ) * deltaTime * 5;
-
+    
     // --- CÂMERA E PROJEÇÃO ---
     const fov = 60 * Math.PI / 180;
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     const projection = m4.perspective(fov, aspect, 0.1, 200);
+    
+    // --- Controle de Câmera ---
+    let offset, up;
+    if (teclasPressionadas['1'] == true){
+        cameraAtual = 1;
+    }
+    if (teclasPressionadas['2'] == true){
+        cameraAtual = 2;
+    }
+    switch(cameraAtual){
+        case 1: 
+            offset = [0, 40, 0];
+            up = [0, 0, -1];
+            break;
+        case 2:
+            offset = [0, 10, 20];
+            up = [0, 1, 0];
+            break;
+    }
 
-    const offset = [0, 5, 10];
     const cameraPosition = [
         navePos[0] + offset[0],
         navePos[1] + offset[1],
         navePos[2] + offset[2]
     ]
     const target = navePos;
-    const up = [0, 1, 0];
     
+
+
     const camera = m4.lookAt(cameraPosition, target, up);
     const view = m4.inverse(camera);
     const viewProjection = m4.multiply(projection, view);
