@@ -92,19 +92,20 @@ let inclinacaoAtualZ = 0;
 
 // --- CONFIGURAÇÃO DE CÂMERA ---
 let cameraAtual = 2;
+let cameraC = 0; // Variável para alternar entre as câmeras
 
 // --- LEITURA DE TECLAS ---
 const teclasPressionadas = {};
-window.addEventListener('keydown',(e)=>{
-teclasPressionadas[e.key.toLowerCase()] = true;
-if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.key) > -1) {
+window.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].indexOf(e.key) > -1) {
         e.preventDefault();
     }
-})
-
-window.addEventListener('keyup',(e)=>{
-teclasPressionadas[e.key.toLowerCase()] = false;
-})
+    teclasPressionadas[key] = true;
+});
+window.addEventListener('keyup', (e) => {
+    teclasPressionadas[e.key.toLowerCase()] = false;
+});
 
 // --- GAME LOOP ---
 function render(time) {
@@ -155,20 +156,44 @@ function render(time) {
     
     // --- Controle de Câmera ---
     let offset, up;
+
     if (teclasPressionadas['1'] == true){
         cameraAtual = 1;
     }
     if (teclasPressionadas['2'] == true){
         cameraAtual = 2;
     }
+    if (teclasPressionadas['c'] == true){
+        if(cameraAtual == 2){
+            cameraC = (cameraC + 1) % 4; // Alterna entre as 4 posições da câmera
+        }
+        teclasPressionadas['c'] = false; // Evita múltiplos incrementos por frame
+    }
+
     switch(cameraAtual){
         case 1: 
             offset = [0, 40, 0];
             up = [0, 0, -1];
             break;
         case 2:
-            offset = [0, 10, 20];
-            up = [0, 1, 0];
+            switch(cameraC){
+                case 0:
+                    offset = [0, 10, 20];
+                    up = [0, 1, 0];
+                    break;
+                case 1:
+                    offset = [0, 10, -20];
+                    up = [0, 1, 0];
+                    break;
+                case 2:
+                    offset = [20, 10, 0];
+                    up = [0, 1, 0];
+                    break;
+                case 3:
+                    offset = [-20, 10, 0];
+                    up = [0, 1, 0];
+                    break;
+            }
             break;
     }
 
