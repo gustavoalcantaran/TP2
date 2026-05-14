@@ -44,7 +44,58 @@ const cabineOvniBuffer = primitives.createSphereBufferInfo(gl, 1.5, 30, 30);
 // 3. Anel :
 const anelOvniBuffer = primitives.createTorusBufferInfo(gl, 3.5, 0.2, 10, 12);
 
-// Árvore (Low-poly)
+// --- OBJETOS DA FAZENDA ---
+// --- SILO ---
+
+const siloCilindroBuffer = primitives.createCylinderBufferInfo(gl,2,6,16,1);
+const siloTetoBuffer = primitives.createSphereBufferInfo(gl, 2, 16, 16);
+function desenharSilo(viewProjectionMatrix, posX, posZ){
+    let matrizCorpo = m4.translation([posX,3,posZ]);
+    let finalMatrixCorpo = m4.multiply(viewProjectionMatrix, matrizCorpo);
+
+    setBuffersAndAttributes(gl, programInfo, siloCilindroBuffer);
+    setUniforms(programInfo, {
+        u_worldViewProjection: finalMatrixCorpo,
+        u_color: [0.7, 0.7, 0.7, 1],
+    });
+    drawBufferInfo(gl, siloCilindroBuffer);
+
+    let matrizTeto = m4.translation([posX, 6, posZ]);
+    let finalMatrixTeto = m4.multiply(viewProjectionMatrix, matrizTeto);
+    
+    setBuffersAndAttributes(gl, programInfo, siloTetoBuffer);
+    setUniforms(programInfo, {
+        u_worldViewProjection: finalMatrixTeto,
+        u_color: [0.5, 0.5, 0.5, 1], // Cinza mais escuro
+    });
+    drawBufferInfo(gl, siloTetoBuffer);
+}
+
+// --- CELEIRO ---
+const celeiroCorpoBuffer = primitives.createCubeBufferInfo(gl,4);
+const celeiroTetoBuffer = primitives.createTruncatedConeBufferInfo(gl,3.5, 0, 2, 4, 1);
+function desenharCeleiro(viewProjectionMatrix, posX, posZ){
+    let matrizCorpo = m4.translation([posX, 2, posZ]);
+    let finalMatrixCorpo = m4.multiply(viewProjectionMatrix, matrizCorpo);
+    setBuffersAndAttributes(gl, programInfo, celeiroCorpoBuffer);
+    setUniforms(programInfo, {
+        u_worldViewProjection: finalMatrixCorpo,
+        u_color: [0.7, 0.1, 0.1, 1],
+    });
+    drawBufferInfo(gl, celeiroCorpoBuffer);
+
+    let matrizTeto = m4.translation([posX, 5, posZ]);
+    matrizTeto = m4.rotateY(matrizTeto, Math.PI / 4);
+    let finalMatrixTeto = m4.multiply(viewProjectionMatrix, matrizTeto);
+    setBuffersAndAttributes(gl, programInfo, celeiroTetoBuffer);
+    setUniforms(programInfo, {
+        u_worldViewProjection: finalMatrixTeto,
+        u_color: [0.3, 0.2, 0.1, 1],
+    });
+    drawBufferInfo(gl, celeiroTetoBuffer);
+}
+
+// --- ÁRVORE --- 
 const troncoBuffer = primitives.createCylinderBufferInfo(gl, 0.5, 2, 6, 1); // Raio 0.5, Altura 2
 const folhasBuffer = primitives.createTruncatedConeBufferInfo(gl, 2, 0, 3, 6, 1); // Raio base 2, topo 0, Altura 3
 function criarArvore(viewProjection, posX, posZ){
@@ -82,6 +133,18 @@ for(let i = 0; i < quantidadeArvores; i++){
     });
 }
 
+// --- CONFIGURAÇÃO DAS CONSTRUÇÕES ---
+
+const quantidadeConstrucoes = 10;
+const construcoes = [];
+for (let i = 0; i < quantidadeConstrucoes; i++){
+    let tipo = Math.random() > 0.5 ? 1 : 0;
+    construcoes.push({
+        x : (Math.random()-0.5) * 100,
+        z : -Math.random() * profundidadeVisao,
+        tipo : tipo
+    });
+}
 
 // --- CONFIGURAÇÃO DA NAVE ---
 let navePos = [0,7,0];
@@ -203,8 +266,6 @@ function render(time) {
         navePos[2] + offset[2]
     ]
     const target = navePos;
-    
-
 
     const camera = m4.lookAt(cameraPosition, target, up);
     const view = m4.inverse(camera);
@@ -240,6 +301,24 @@ function render(time) {
             arvore.x = (Math.random() - 0.5) * 200; // Nova posição X aleatória
         }
         criarArvore(viewProjection, arvore.x, arvore.z);
+    }
+
+    // --- DESENHAR AS CONSTRUÇÕES ---
+    for (let construcao of construcoes){
+        if (construcao.z > posCameraZ + limiteTras){
+            construcao.z -= tamanhoTotal;
+            construcao.x = (Math.random() - 0.5) * 200;
+        }
+        else if(construcao.z < posCameraZ - limiteFrente){
+            construcao.z += tamanhoTotal;
+            construcao.x = (Math.random() - 0.5) * 200;
+        }
+        if (construcao.tipo == 1){
+            desenharCeleiro(viewProjection, construcao.x, construcao.z);
+        }
+        else if (construcao.tipo == 0){
+            desenharSilo(viewProjection, construcao.x, construcao.z);
+        }
     }
 
     // --- DESENHAR O OVNI ---
