@@ -32,9 +32,16 @@ if (!gl) {
 // Compila os shaders magicamente
 const programInfo = createProgramInfo(gl, [vsSource, fsSource]);
 
+//Função de Geração Procedimental
+//Vai devolver o mesmo número entre 0 e 1 para as mesmas coodernada X e Z
+function pseudoRandom(x, z) {
+    let n = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+    return n - Math.floor(n);
+}
+
 // --- CRIAÇÃO DOS OBJETOS 3D ---
 // Chão (Plane): O "10, 10" no final significa poucas subdivisões (ideal para low-poly!)
-const chaoBuffer = primitives.createPlaneBufferInfo(gl, 200, 200, 10, 10);
+const chaoBuffer = primitives.createPlaneBufferInfo(gl, 400, 400, 10, 10);
 
 // --- CRIAÇÃO DO OVNI ---
 // 1. Corpo/Chassi:
@@ -98,7 +105,7 @@ function desenharCeleiro(viewProjectionMatrix, posX, posZ){
 // --- ÁRVORE --- 
 const troncoBuffer = primitives.createCylinderBufferInfo(gl, 0.5, 2, 6, 1); // Raio 0.5, Altura 2
 const folhasBuffer = primitives.createTruncatedConeBufferInfo(gl, 2, 0, 3, 6, 1); // Raio base 2, topo 0, Altura 3
-function criarArvore(viewProjection, posX, posZ){
+function desenharArvore(viewProjection, posX, posZ){
     // Desenha o tronco
     let matrixTronco = m4.translation([posX, 1, posZ]);
     let finalMatrixTronco = m4.multiply(viewProjection, matrixTronco);
@@ -121,33 +128,38 @@ function criarArvore(viewProjection, posX, posZ){
 
 }
 
-// --- CONFIGURAÇÃO DAS ÁRVORES ---
-const quantidadeArvores = 50;
-const arvores= [];
-const profundidadeVisao = 120;
+// -- DISTRIBUIÇÃO HARMÔNICA (ESTILO SPORE)
+const tamanhoLote = 20;
+const colunas = 15;
+const linhas = 15;
+const limiteTras = 40;
+const metadeX = (colunas * tamanhoLote) / 2;
 
-for(let i = 0; i < quantidadeArvores; i++){
-        arvores.push({
-        x : (Math.random() - 0.5) * 100, // Distribuição aleatória no eixo X
-        z : -Math.random() * profundidadeVisao // Distribuição aleatória no eixo Z, mais próximas da nave
-    });
+const objetosFazenda = [];
+
+for(let l = 0; l < linhas; l++){
+    for(let c = 0; c < colunas; c++){
+        let obj = {coluna : c, linha : l};
+        atualizarObjetoFazena(obj);
+        objetosFazenda.push(obj);
+    }
 }
 
-// --- CONFIGURAÇÃO DAS CONSTRUÇÕES ---
+function atualizarObjetoFazena(obj){
 
-const quantidadeConstrucoes = 10;
-const construcoes = [];
-for (let i = 0; i < quantidadeConstrucoes; i++){
-    let tipo = Math.random() > 0.5 ? 1 : 0;
-    construcoes.push({
-        x : (Math.random()-0.5) * 100,
-        z : -Math.random() * profundidadeVisao,
-        tipo : tipo
-    });
+    let desvioX = (pseudoRandom(obj.coluna, obj.linha) - 0.5) * 16;
+    let desvioZ = (pseudoRandom(obj.coluna + 73, obj.linha + 42) - 0.5) * 16;
+    obj.x = (obj.coluna*tamanhoLote - metadeX) + desvioX;
+    obj.z = (-obj.linha*tamanhoLote) + desvioZ;
+
+    let chance = pseudoRandom(obj.coluna+100, obj.linha+200);
+    if (chance > 0.97) obj.tipo = 'silo';
+    else if (chance > 0.93) obj.tipo = 'celeiro';
+    else obj.tipo = 'arvore';
 }
 
 // --- CONFIGURAÇÃO DA NAVE ---
-let navePos = [0,7,0];
+let navePos = [0,20,0];
 let tempoAnterior = 0;
 const velocidadeOvni = 20;
 let inclinacaoAtualX = 0;
@@ -285,39 +297,38 @@ function render(time) {
     });
     drawBufferInfo(gl, chaoBuffer);
 
-    // --- DESENHAR AS ÁRVORES ---
-    const limiteTras = 20;
-    const limiteFrente = profundidadeVisao;
-    const tamanhoTotal = limiteFrente + limiteTras;
+    // --- DESENHAR OBJETOS ---
     const posCameraZ = cameraPosition[2];
+    const posCameraX = cameraPosition[0];
+    const tamanhoTotalZ = linhas * tamanhoLote;
+    const tamanhoTotalX = colunas * tamanhoLote;
 
-    for (let arvore of arvores){
-        if(arvore.z > posCameraZ + limiteTras){
-            arvore.z -= tamanhoTotal; // Reposiciona a árvore para trás da visão
-            arvore.x = (Math.random() - 0.5) * 200; // Nova posição X aleatória
+    for (let i = 0; i < objetosFazenda.length; i++){
+        let obj = objetosFazenda[i];
+        if (obj.z > posCameraZ + limiteTras){
+            obj.linha += linhas;
+            atualizarObjetoFazena(obj);
         }
-        else if (arvore.z < posCameraZ - limiteFrente){
-            arvore.z += tamanhoTotal; // Reposiciona a árvore para frente da visão
-            arvore.x = (Math.random() - 0.5) * 200; // Nova posição X aleatória
+        else if (obj.z < posCameraZ - tamanhoTotalZ + limiteTras){
+            obj.linha -= linhas;
+            atualizarObjetoFazena(obj);
         }
-        criarArvore(viewProjection, arvore.x, arvore.z);
-    }
-
-    // --- DESENHAR AS CONSTRUÇÕES ---
-    for (let construcao of construcoes){
-        if (construcao.z > posCameraZ + limiteTras){
-            construcao.z -= tamanhoTotal;
-            construcao.x = (Math.random() - 0.5) * 200;
+        if(obj.x < posCameraX - metadeX){
+            obj.coluna += colunas;
+            atualizarObjetoFazena(obj);
         }
-        else if(construcao.z < posCameraZ - limiteFrente){
-            construcao.z += tamanhoTotal;
-            construcao.x = (Math.random() - 0.5) * 200;
+        else if (obj.x > posCameraX + metadeX){
+            obj.coluna -= colunas;
+            atualizarObjetoFazena(obj);
         }
-        if (construcao.tipo == 1){
-            desenharCeleiro(viewProjection, construcao.x, construcao.z);
+        if (obj.tipo == 'arvore'){
+            desenharArvore(viewProjection, obj.x, obj.z);
         }
-        else if (construcao.tipo == 0){
-            desenharSilo(viewProjection, construcao.x, construcao.z);
+        else if (obj.tipo == 'silo'){
+            desenharSilo(viewProjection, obj.x, obj.z);
+        }
+        else if (obj.tipo == 'celeiro'){
+            desenharCeleiro(viewProjection, obj.x, obj.z);
         }
     }
 
