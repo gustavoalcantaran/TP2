@@ -2,27 +2,71 @@ import { m4, primitives, createProgramInfo, resizeCanvasToDisplaySize, setBuffer
 
 // --- SHADERS ---
 const vsSource = `
+precision mediump float;
 uniform mat4 u_worldViewProjection;
+uniform mat4 u_world;
 attribute vec4 position;
+attribute vec3 normal;
+varying vec3 v_normal;
 
 void main() {
     gl_Position = u_worldViewProjection * position;
+    v_normal = mat3(u_world) * normal;
 }
 `;
 
 // --- FRAGMENT SHADER ---
 const fsSource = `
 precision mediump float;
+
+varying vec3 v_normal;
+uniform vec3 u_lightDirection;
 uniform vec4 u_color;
 
 void main() {
-    gl_FragColor = u_color;
+    vec3 lightDir = normalize(-u_lightDirection);
+    float brightness = dot(normalize(v_normal), lightDir);
+    
+    // 4 níveis de toon ao invés de 3
+    float toon;
+    if      (brightness > 0.85) toon = 1.0;
+    else if (brightness > 0.55) toon = 0.7;
+    else if (brightness > 0.20) toon = 0.4;
+    else                        toon = 0.15;
+
+    gl_FragColor = vec4(u_color.rgb * toon, u_color.a);
 }
 `;
+
+
 
 // --- CONFIGURAÇÃO INICIAL ---
 const canvas = document.getElementById("gameCanvas");
 const gl = canvas.getContext("webgl2");
+
+const vsOutline = `
+precision mediump float;
+uniform mat4 u_worldViewProjection;
+uniform mat4 u_world;
+attribute vec4 position;
+attribute vec3 normal;
+
+void main() {
+    // Expande o objeto levemente ao longo das normais
+    vec3 norm = normalize(mat3(u_world) * normal);
+    vec4 pos = position + vec4(norm * 0.08, 0.0);
+    gl_Position = u_worldViewProjection * pos;
+}
+`;
+
+const fsOutline = `
+precision mediump float;
+void main() {
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); // Preto sólido
+}
+`;
+
+const outlineProgramInfo = createProgramInfo(gl, [vsOutline, fsOutline]);
 
 // Verifica se o WebGL2 está funcionando
 if (!gl) {
@@ -39,13 +83,38 @@ function pseudoRandom(x, z) {
     return n - Math.floor(n);
 }
 
+// --- FUNÇÃO PARA CRIAR OUTLINE ---
+function desenharComOutline(bufferInfo, worldMatrix, viewProjection, color) {
+    const wvp = m4.multiply(viewProjection, worldMatrix);
+    gl.cullFace(gl.FRONT); // Renderiza só as faces de trás
+    gl.enable(gl.CULL_FACE);
+    gl.useProgram(outlineProgramInfo.program);
+    setBuffersAndAttributes(gl, outlineProgramInfo, bufferInfo);
+    setUniforms(outlineProgramInfo, {
+        u_worldViewProjection: wvp,
+        u_world: worldMatrix,
+    });
+    drawBufferInfo(gl, bufferInfo);
+
+    gl.cullFace(gl.BACK);
+    gl.useProgram(programInfo.program);
+    setBuffersAndAttributes(gl, programInfo, bufferInfo);
+    setUniforms(programInfo, {
+        u_worldViewProjection: wvp,
+        u_world: worldMatrix,
+        u_lightDirection: luzDirecao,
+        u_color: color,
+    });
+    drawBufferInfo(gl, bufferInfo);
+}
+
 // --- CRIAÇÃO DOS OBJETOS 3D ---
 // Chão (Plane): O "10, 10" no final significa poucas subdivisões (ideal para low-poly!)
 const chaoBuffer = primitives.createPlaneBufferInfo(gl, 400, 400, 10, 10);
 
 // --- CRIAÇÃO DO OVNI ---
 // 1. Corpo/Chassi:
-const corpoOvniBuffer = primitives.createTruncatedConeBufferInfo(gl, 2.3, 2, 0.5, 20, 1);
+const corpoOvniBuffer = primitives.createTruncatedConeBufferInfo(gl, 2.3, 2, 0.5, 10, 1);
 // 2. Cabine : 
 const cabineOvniBuffer = primitives.createSphereBufferInfo(gl, 1.5, 30, 30);
 // 3. Anel :
@@ -57,75 +126,29 @@ const anelOvniBuffer = primitives.createTorusBufferInfo(gl, 3.5, 0.2, 10, 12);
 const siloCilindroBuffer = primitives.createCylinderBufferInfo(gl,2,6,16,1);
 const siloTetoBuffer = primitives.createSphereBufferInfo(gl, 2, 16, 16);
 function desenharSilo(viewProjectionMatrix, posX, posZ){
-    let matrizCorpo = m4.translation([posX,3,posZ]);
-    let finalMatrixCorpo = m4.multiply(viewProjectionMatrix, matrizCorpo);
-
-    setBuffersAndAttributes(gl, programInfo, siloCilindroBuffer);
-    setUniforms(programInfo, {
-        u_worldViewProjection: finalMatrixCorpo,
-        u_color: [0.7, 0.7, 0.7, 1],
-    });
-    drawBufferInfo(gl, siloCilindroBuffer);
-
-    let matrizTeto = m4.translation([posX, 6, posZ]);
-    let finalMatrixTeto = m4.multiply(viewProjectionMatrix, matrizTeto);
-    
-    setBuffersAndAttributes(gl, programInfo, siloTetoBuffer);
-    setUniforms(programInfo, {
-        u_worldViewProjection: finalMatrixTeto,
-        u_color: [0.5, 0.5, 0.5, 1], // Cinza mais escuro
-    });
-    drawBufferInfo(gl, siloTetoBuffer);
+    desenharComOutline(siloCilindroBuffer, m4.translation([posX, 3, posZ]), viewProjectionMatrix, [0.7, 0.7, 0.7, 1]);
+    desenharComOutline(siloTetoBuffer, m4.translation([posX, 6, posZ]), viewProjectionMatrix, [0.5, 0.5, 0.5, 1]);
 }
 
 // --- CELEIRO ---
 const celeiroCorpoBuffer = primitives.createCubeBufferInfo(gl,4);
 const celeiroTetoBuffer = primitives.createTruncatedConeBufferInfo(gl,3.5, 0, 2, 4, 1);
 function desenharCeleiro(viewProjectionMatrix, posX, posZ){
-    let matrizCorpo = m4.translation([posX, 2, posZ]);
-    let finalMatrixCorpo = m4.multiply(viewProjectionMatrix, matrizCorpo);
-    setBuffersAndAttributes(gl, programInfo, celeiroCorpoBuffer);
-    setUniforms(programInfo, {
-        u_worldViewProjection: finalMatrixCorpo,
-        u_color: [0.7, 0.1, 0.1, 1],
-    });
-    drawBufferInfo(gl, celeiroCorpoBuffer);
-
-    let matrizTeto = m4.translation([posX, 5, posZ]);
-    matrizTeto = m4.rotateY(matrizTeto, Math.PI / 4);
-    let finalMatrixTeto = m4.multiply(viewProjectionMatrix, matrizTeto);
-    setBuffersAndAttributes(gl, programInfo, celeiroTetoBuffer);
-    setUniforms(programInfo, {
-        u_worldViewProjection: finalMatrixTeto,
-        u_color: [0.3, 0.2, 0.1, 1],
-    });
-    drawBufferInfo(gl, celeiroTetoBuffer);
+    //Desenha o corpo do celeiro
+    desenharComOutline(celeiroCorpoBuffer, m4.translation([posX, 2, posZ]), viewProjectionMatrix, [0.7, 0.1, 0.1, 1]);
+    let matrizTeto = m4.rotateY(m4.translation([posX, 5, posZ]), Math.PI / 4);
+    //Desenha o teto do celeiro
+    desenharComOutline(celeiroTetoBuffer,  matrizTeto, viewProjectionMatrix, [0.3, 0.2, 0.1, 1]);
 }
 
 // --- ÁRVORE --- 
 const troncoBuffer = primitives.createCylinderBufferInfo(gl, 0.5, 2, 6, 1); // Raio 0.5, Altura 2
 const folhasBuffer = primitives.createTruncatedConeBufferInfo(gl, 2, 0, 3, 6, 1); // Raio base 2, topo 0, Altura 3
-function desenharArvore(viewProjection, posX, posZ){
+function desenharArvore(viewProjectionMatrix, posX, posZ){
     // Desenha o tronco
-    let matrixTronco = m4.translation([posX, 1, posZ]);
-    let finalMatrixTronco = m4.multiply(viewProjection, matrixTronco);
-    setBuffersAndAttributes(gl, programInfo, troncoBuffer);
-    setUniforms(programInfo, {
-        u_worldViewProjection: finalMatrixTronco,
-        u_color: [0.55, 0.27, 0.07, 1], // Marrom
-    });
-    drawBufferInfo(gl, troncoBuffer);
-
+    desenharComOutline(troncoBuffer,  m4.translation([posX, 1,   posZ]), viewProjectionMatrix, [0.55, 0.27, 0.07, 1]);
     // Desenha as folhas
-    let matrixFolhas = m4.translation([posX, 3.5, posZ]);
-    let finalMatrixFolhas = m4.multiply(viewProjection, matrixFolhas);
-    setBuffersAndAttributes(gl, programInfo, folhasBuffer);
-    setUniforms(programInfo, {
-        u_worldViewProjection: finalMatrixFolhas,
-        u_color: [0.2, 0.8, 0.2, 1], // Verde
-    });
-    drawBufferInfo(gl, folhasBuffer);
-
+    desenharComOutline(folhasBuffer,  m4.translation([posX, 3.5, posZ]), viewProjectionMatrix, [0.2,  0.8,  0.2,  1]);
 }
 
 // -- DISTRIBUIÇÃO HARMÔNICA (ESTILO SPORE)
@@ -168,6 +191,9 @@ let inclinacaoAtualZ = 0;
 // --- CONFIGURAÇÃO DE CÂMERA ---
 let cameraAtual = 2;
 let cameraC = 0; // Variável para alternar entre as câmeras
+
+// --- CONFIGURAÇÃO DE ILUMINAÇÃO ---
+const luzDirecao = [-1.0, -0.8, 0.3]; 
 
 // --- LEITURA DE TECLAS ---
 const teclasPressionadas = {};
@@ -296,6 +322,8 @@ function render(time) {
     setBuffersAndAttributes(gl, programInfo, chaoBuffer);
     setUniforms(programInfo, {
         u_worldViewProjection: finalMatrixChao,
+        u_world: m4.identity(),
+        u_lightDirection: luzDirecao,
         u_color: [0.3, 0.8, 0.4, 1], // Verde grama
     });
     drawBufferInfo(gl, chaoBuffer);
@@ -336,43 +364,26 @@ function render(time) {
     }
 
     // --- DESENHAR O OVNI ---
-    //Controla a posição global do OVNI no mundo
     let matrizBaseOvni = m4.translation(navePos);
-    //Leve inclinação para parecer que está voando
-    matrizBaseOvni = m4.rotateX(matrizBaseOvni, inclinacaoAtualX);
-    matrizBaseOvni = m4.rotateZ(matrizBaseOvni, inclinacaoAtualZ);
-    matrizBaseOvni = m4.rotateY(matrizBaseOvni, Math.sin(time * 2) * 0.05);
+    matrizBaseOvni = m4.rotateX(matrizBaseOvni, inclinacaoAtualX);  
+    matrizBaseOvni = m4.rotateZ(matrizBaseOvni, inclinacaoAtualZ); 
+    matrizBaseOvni = m4.rotateY(matrizBaseOvni, time * 2);
+    desenharComOutline(corpoOvniBuffer,matrizBaseOvni, viewProjection, [0.6, 0.6, 0.6, 1.0]);
+    desenharComOutline(anelOvniBuffer, m4.rotateZ(m4.rotateY(matrizBaseOvni, time * 4), 0.05), viewProjection, [0.1, 0.9, 0.2, 1.0]);
 
-    // Desenhar o corpo
-    let finalMatrixCorpo = m4.multiply(viewProjection, matrizBaseOvni);
-    setBuffersAndAttributes(gl, programInfo, corpoOvniBuffer);
-    setUniforms(programInfo, {
-        u_worldViewProjection: finalMatrixCorpo,
-        u_color: [0.6, 0.6, 0.6, 1], // Cinza
-    });
-    drawBufferInfo(gl, corpoOvniBuffer);
-
-    // Desenhar o anel
-    let matrizAnel = m4.rotateY(matrizBaseOvni, time*5);
-    matrizAnel = m4.rotateZ(matrizAnel, 0.05);
-    let finalMatrixAnel = m4.multiply(viewProjection, matrizAnel);
-    setBuffersAndAttributes(gl, programInfo, anelOvniBuffer);
-    setUniforms(programInfo, {
-        u_worldViewProjection: finalMatrixAnel,
-        u_color: [0.1, 0.9, 0.2, 1], // Verde neon
-    });
-    drawBufferInfo(gl, anelOvniBuffer);
-
-    // Desenhar a cabine
-    let matrizCabine = m4.translate(matrizBaseOvni, [0, 0.8, 0]);
-    let finalMatrixCabine = m4.multiply(viewProjection, matrizCabine);
+    // Cabine: transparente, sem outline (outline em objeto transparente fica estranho)
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    const wvpCabine = m4.multiply(viewProjection, m4.translate(matrizBaseOvni, [0, 0.8, 0]));
+    gl.useProgram(programInfo.program);
     setBuffersAndAttributes(gl, programInfo, cabineOvniBuffer);
     setUniforms(programInfo, {
-        u_worldViewProjection: finalMatrixCabine,
-        u_color: [0.2, 0.8, 0.8, 0.4], // Ciano
+        u_worldViewProjection: wvpCabine,
+        u_world: m4.translate(matrizBaseOvni, [0, 0.8, 0]),
+        u_lightDirection: luzDirecao,
+        u_color: [0.2, 0.8, 0.8, 0.4],
     });
     drawBufferInfo(gl, cabineOvniBuffer);
-
     gl.disable(gl.BLEND);
 
     requestAnimationFrame(render);
