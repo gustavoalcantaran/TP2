@@ -52,8 +52,8 @@ const cabineOvniBuffer = primitives.createSphereBufferInfo(gl, 1.5, 30, 30);
 const anelOvniBuffer = primitives.createTorusBufferInfo(gl, 3.5, 0.2, 10, 12);
 
 // --- OBJETOS DA FAZENDA ---
-// --- SILO ---
 
+// --- SILO ---
 const siloCilindroBuffer = primitives.createCylinderBufferInfo(gl,2,6,16,1);
 const siloTetoBuffer = primitives.createSphereBufferInfo(gl, 2, 16, 16);
 function desenharSilo(viewProjectionMatrix, posX, posZ){
@@ -197,6 +197,9 @@ function render(time) {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     gl.useProgram(programInfo.program);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     // --- Controles de voo ---
     let inclinacaoAlvoX = 0;
@@ -349,16 +352,6 @@ function render(time) {
     });
     drawBufferInfo(gl, corpoOvniBuffer);
 
-    // Desenhar a cabine
-    let matrizCabine = m4.translate(matrizBaseOvni, [0, 0.8, 0]);
-    let finalMatrixCabine = m4.multiply(viewProjection, matrizCabine);
-    setBuffersAndAttributes(gl, programInfo, cabineOvniBuffer);
-    setUniforms(programInfo, {
-        u_worldViewProjection: finalMatrixCabine,
-        u_color: [0.2, 0.8, 0.8, 1], // Ciano
-    });
-    drawBufferInfo(gl, cabineOvniBuffer);
-
     // Desenhar o anel
     let matrizAnel = m4.rotateY(matrizBaseOvni, time*5);
     matrizAnel = m4.rotateZ(matrizAnel, 0.05);
@@ -369,6 +362,18 @@ function render(time) {
         u_color: [0.1, 0.9, 0.2, 1], // Verde neon
     });
     drawBufferInfo(gl, anelOvniBuffer);
+
+    // Desenhar a cabine
+    let matrizCabine = m4.translate(matrizBaseOvni, [0, 0.8, 0]);
+    let finalMatrixCabine = m4.multiply(viewProjection, matrizCabine);
+    setBuffersAndAttributes(gl, programInfo, cabineOvniBuffer);
+    setUniforms(programInfo, {
+        u_worldViewProjection: finalMatrixCabine,
+        u_color: [0.2, 0.8, 0.8, 0.4], // Ciano
+    });
+    drawBufferInfo(gl, cabineOvniBuffer);
+
+    gl.disable(gl.BLEND);
 
     requestAnimationFrame(render);
 }
