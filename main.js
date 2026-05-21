@@ -40,7 +40,7 @@ void main() {
     else                        toon = 0.15;
     
     float distancia = length(v_worldPos.xz - u_ovniPos.xz);
-    float alcance = 8.0;
+    float alcance = 8.0 + u_ovniPos.y * 0.2;
     float claridade = max(0.0, 1.0 - (distancia / alcance)) * u_raioIntensidade;
     toon = max(toon, claridade);
     gl_FragColor = vec4(u_color.rgb * toon, u_color.a);
@@ -407,10 +407,11 @@ function render(time) {
     let matrizBaseOvni = m4.translation(navePos);
     // posiciona o cone de abdução de forma que o topo fique logo abaixo da nave
     const coneHalf = 4;
-    const worldAbducao = m4.translate(m4.translation(navePos), [0, -(coneHalf + 0.5), 0]);
+    let worldAbducao = m4.translate(m4.translation(navePos), [0, -(coneHalf + 0.5), 0]);
     matrizBaseOvni = m4.rotateX(matrizBaseOvni, inclinacaoAtualX);  
     matrizBaseOvni = m4.rotateZ(matrizBaseOvni, inclinacaoAtualZ); 
     matrizBaseOvni = m4.rotateY(matrizBaseOvni, time * 2);
+    matrizBaseOvni = m4.scale(matrizBaseOvni, [1.5, 1.5, 1.5]);
     desenharComOutline(corpoOvniBuffer,matrizBaseOvni, viewProjection, [0.6, 0.6, 0.6, 1.0]);
     desenharComOutline(anelOvniBuffer, m4.rotateZ(m4.rotateY(matrizBaseOvni, time * 4), 0.05), viewProjection, [0.1, 0.9, 0.2, 1.0]);
     // Cabine: transparente, sem outline (outline em objeto transparente fica estranho)
@@ -427,13 +428,16 @@ function render(time) {
     });
     drawBufferInfo(gl, cabineOvniBuffer);
 
-    // Desenha o cone de abdução por último (transparência) e sem escrever no depth buffer
+    // --- DESENHAR RAIO DE ABDUÇÃO ---
+    const alturaRaio = navePos[1];
+    worldAbducao = m4.translation([navePos[0], navePos[1] - alturaRaio/2, navePos[2]]);
+    const worldAbducaoEscalado = m4.scale(worldAbducao, [1, alturaRaio/8, 1]); 
     gl.depthMask(false);
     gl.useProgram(programInfo.program);
     setBuffersAndAttributes(gl, programInfo, raioAbducaoBuffer);
     setUniforms(programInfo, {
-        u_worldViewProjection: m4.multiply(viewProjection, worldAbducao),
-        u_world: worldAbducao,
+        u_worldViewProjection: m4.multiply(viewProjection, worldAbducaoEscalado),
+        u_world: worldAbducaoEscalado,
         u_color: [0.8, 0.8, 0.1, 0.5 * tempoAbducao],
     });
     drawBufferInfo(gl, raioAbducaoBuffer);
