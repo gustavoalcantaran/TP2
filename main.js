@@ -243,9 +243,6 @@ function render(time) {
     gl.enable(gl.DEPTH_TEST);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    const ambientAlvo = raioAtivo ? 1.0 : 0.0;
-    globalUniforms.u_raioIntensidade += (ambientAlvo - globalUniforms.u_raioIntensidade) * deltaTime * 5;
-
     gl.useProgram(programInfo.program);
     setUniforms(programInfo, globalUniforms);
 
@@ -299,15 +296,12 @@ function render(time) {
         teclasPressionadas['c'] = false; // Evita múltiplos incrementos por frame
     }
     if (teclasPressionadas[' '] == true){
-        tempoAbducao = 1; 
+        tempoAbducao = 1;
+        globalUniforms.u_raioIntensidade = 1; 
     }
     tempoAbducao += (-tempoAbducao) * deltaTime * 3;
-
     //Controlar luz que o OVNI faz
-    if(tempoAbducao < 0.01){
-        raioAtivo = false;
-    } else raioAtivo = true;
-
+    globalUniforms.u_raioIntensidade += (tempoAbducao - globalUniforms.u_raioIntensidade) * deltaTime * 5;
     switch(cameraAtual){
         case 1: 
             offset = [0, 40, 0];
@@ -316,19 +310,19 @@ function render(time) {
         case 2:
             switch(cameraC){
                 case 0:
-                    offset = [0, 10, 20];
+                    offset = [0, 15, 30];
                     up = [0, 1, 0];
                     break;
                 case 1:
-                    offset = [0, 10, -20];
+                    offset = [0, 15, -30];
                     up = [0, 1, 0];
                     break;
                 case 2:
-                    offset = [20, 10, 0];
+                    offset = [30, 15, 0];
                     up = [0, 1, 0];
                     break;
                 case 3:
-                    offset = [-20, 10, 0];
+                    offset = [-30, 15, 0];
                     up = [0, 1, 0];
                     break;
             }
