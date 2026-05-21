@@ -27,6 +27,7 @@ uniform vec3 u_lightDirection;
 uniform vec4 u_color;
 uniform vec3 u_ovniPos;
 uniform float u_raioIntensidade;
+uniform float u_iluminacaoAtiva;
 
 void main() {
     vec3 lightDir = normalize(-u_lightDirection);
@@ -43,7 +44,9 @@ void main() {
     float alcance = 8.0 + u_ovniPos.y * 0.2;
     float claridade = max(0.0, 1.0 - (distancia / alcance)) * u_raioIntensidade;
     toon = max(toon, claridade);
-    gl_FragColor = vec4(u_color.rgb * toon, u_color.a);
+
+    float brilhoFinal = mix(1.0, toon, u_iluminacaoAtiva);
+    gl_FragColor = vec4(u_color.rgb * brilhoFinal, u_color.a);
 }
 `;
 
@@ -208,12 +211,14 @@ let cameraC = 0; // Variável para alternar entre as câmeras
 // --- CONFIGURAÇÃO DE ILUMINAÇÃO ---
 const luzDirecao = [-1.0, -0.8, -1.0]; 
 let raioAtivo = false;
+let iluminacaoAtiva = true;
 
 // Uniforms globais compartilhados por todos os draws
 const globalUniforms = {
     u_lightDirection: luzDirecao,
     u_ovniPos: navePos,
     u_raioIntensidade: 0.0,
+    u_iluminacaoAtiva : 1.0,
 };
 
 // --- LEITURA DE TECLAS ---
@@ -298,6 +303,11 @@ function render(time) {
     if (teclasPressionadas[' '] == true){
         tempoAbducao = 1;
         globalUniforms.u_raioIntensidade = 1; 
+    }
+    if (teclasPressionadas['l'] == true){
+        iluminacaoAtiva = !iluminacaoAtiva;
+        globalUniforms.u_iluminacaoAtiva = iluminacaoAtiva ? 1.0 : 0.0;
+        teclasPressionadas['l'] = false;
     }
     tempoAbducao += (-tempoAbducao) * deltaTime * 3;
     //Controlar luz que o OVNI faz
