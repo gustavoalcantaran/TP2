@@ -28,6 +28,7 @@ uniform vec4 u_color;
 uniform vec3 u_ovniPos;
 uniform float u_raioIntensidade;
 uniform float u_iluminacaoAtiva;
+uniform float u_fogAtiva;
 
 void main() {
     vec3 lightDir = normalize(-u_lightDirection);
@@ -45,8 +46,18 @@ void main() {
     float claridade = max(0.0, 1.0 - (distancia / alcance)) * u_raioIntensidade;
     toon = max(toon, claridade);
 
+    
     float brilhoFinal = mix(1.0, toon, u_iluminacaoAtiva);
-    gl_FragColor = vec4(u_color.rgb * brilhoFinal, u_color.a);
+    //Fog
+    float distanciaCamera = length(gl_FragCoord.z/ gl_FragCoord.w);
+    float fogInicio = 100.0;
+    float fogFim = 180.0;
+    float fogFactor = clamp((fogFim - distanciaCamera) / (fogFim - fogInicio), 0.0, 1.0);
+    vec3 corFog = vec3(0.7, 0.8, 0.9);
+    vec3 corFinal = mix(corFog, u_color.rgb * brilhoFinal, fogFactor);
+
+    gl_FragColor = vec4(mix(u_color.rgb * brilhoFinal, corFinal, u_fogAtiva), u_color.a);
+
 }
 `;
 
@@ -212,6 +223,7 @@ let cameraC = 0; // Variável para alternar entre as câmeras
 const luzDirecao = [-1.0, -0.8, -1.0]; 
 let raioAtivo = false;
 let iluminacaoAtiva = true;
+let fogAtiva = true;
 
 // Uniforms globais compartilhados por todos os draws
 const globalUniforms = {
@@ -219,6 +231,7 @@ const globalUniforms = {
     u_ovniPos: navePos,
     u_raioIntensidade: 0.0,
     u_iluminacaoAtiva : 1.0,
+    u_fogAtiva : 1.0
 };
 
 // --- LEITURA DE TECLAS ---
@@ -308,6 +321,11 @@ function render(time) {
         iluminacaoAtiva = !iluminacaoAtiva;
         globalUniforms.u_iluminacaoAtiva = iluminacaoAtiva ? 1.0 : 0.0;
         teclasPressionadas['l'] = false;
+    }
+    if (teclasPressionadas['n'] == true){
+        fogAtiva = !fogAtiva;
+        globalUniforms.u_fogAtiva = fogAtiva ? 1.0 : 0.0;
+        teclasPressionadas['n'] = false;
     }
     tempoAbducao += (-tempoAbducao) * deltaTime * 3;
     //Controlar luz que o OVNI faz
@@ -415,9 +433,6 @@ function render(time) {
 
     // --- DESENHAR O OVNI ---
     let matrizBaseOvni = m4.translation(navePos);
-    // posiciona o cone de abdução de forma que o topo fique logo abaixo da nave
-    const coneHalf = 4;
-    let worldAbducao = m4.translate(m4.translation(navePos), [0, -(coneHalf + 0.5), 0]);
     matrizBaseOvni = m4.rotateX(matrizBaseOvni, inclinacaoAtualX);  
     matrizBaseOvni = m4.rotateZ(matrizBaseOvni, inclinacaoAtualZ); 
     matrizBaseOvni = m4.rotateY(matrizBaseOvni, time * 2);
@@ -440,7 +455,7 @@ function render(time) {
 
     // --- DESENHAR RAIO DE ABDUÇÃO ---
     const alturaRaio = navePos[1];
-    worldAbducao = m4.translation([navePos[0], navePos[1] - alturaRaio/2, navePos[2]]);
+    const worldAbducao = m4.translation([navePos[0], navePos[1] - alturaRaio/2, navePos[2]]);
     const worldAbducaoEscalado = m4.scale(worldAbducao, [1, alturaRaio/8, 1]); 
     gl.depthMask(false);
     gl.useProgram(programInfo.program);
