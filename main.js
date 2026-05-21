@@ -119,6 +119,8 @@ const corpoOvniBuffer = primitives.createTruncatedConeBufferInfo(gl, 2.3, 2, 0.5
 const cabineOvniBuffer = primitives.createSphereBufferInfo(gl, 1.5, 30, 30);
 // 3. Anel :
 const anelOvniBuffer = primitives.createTorusBufferInfo(gl, 3.5, 0.2, 10, 12);
+// Raio de abdução 
+const raioAbducaoBuffer = primitives.createTruncatedConeBufferInfo(gl, 3.5, 0.1, 8, 30, 1);
 
 // --- OBJETOS DA FAZENDA ---
 
@@ -157,6 +159,7 @@ const colunas = 15;
 const linhas = 15;
 const limiteTras = 40;
 const metadeX = (colunas * tamanhoLote) / 2;
+const metadeZ = (linhas * tamanhoLote) / 2;
 
 const objetosFazenda = [];
 
@@ -187,13 +190,14 @@ let tempoAnterior = 0;
 const velocidadeOvni = 20;
 let inclinacaoAtualX = 0;
 let inclinacaoAtualZ = 0;
+let tempoAbducao = 0;
 
 // --- CONFIGURAÇÃO DE CÂMERA ---
 let cameraAtual = 2;
 let cameraC = 0; // Variável para alternar entre as câmeras
 
 // --- CONFIGURAÇÃO DE ILUMINAÇÃO ---
-const luzDirecao = [-1.0, -0.8, 0.3]; 
+const luzDirecao = [-1.0, -0.8, -1.0]; 
 
 // --- LEITURA DE TECLAS ---
 const teclasPressionadas = {};
@@ -273,7 +277,9 @@ function render(time) {
         }
         teclasPressionadas['c'] = false; // Evita múltiplos incrementos por frame
     }
-
+    // Abdução: suaviza subida/descida enquanto a tecla Espaço é pressionada
+    const targetAbduction = teclasPressionadas[" "] ? 1 : 0;
+    tempoAbducao += (targetAbduction - tempoAbducao) * deltaTime * 5; // suaviza transição
     switch(cameraAtual){
         case 1: 
             offset = [0, 40, 0];
@@ -329,26 +335,24 @@ function render(time) {
     drawBufferInfo(gl, chaoBuffer);
 
     // --- DESENHAR OBJETOS ---
-    const posCameraZ = cameraPosition[2];
-    const posCameraX = cameraPosition[0];
-    const tamanhoTotalZ = linhas * tamanhoLote;
-    const tamanhoTotalX = colunas * tamanhoLote;
+    const posNaveZ = navePos[2];
+    const posNaveX = navePos[0];
 
     for (let i = 0; i < objetosFazenda.length; i++){
         let obj = objetosFazenda[i];
-        if (obj.z > posCameraZ + limiteTras){
+        if (obj.z > posNaveZ + metadeZ){
             obj.linha += linhas;
             atualizarObjetoFazena(obj);
         }
-        else if (obj.z < posCameraZ - tamanhoTotalZ + limiteTras){
+        else if (obj.z < posNaveZ - metadeZ){
             obj.linha -= linhas;
             atualizarObjetoFazena(obj);
         }
-        if(obj.x < posCameraX - metadeX){
+        if(obj.x < posNaveX - metadeX){
             obj.coluna += colunas;
             atualizarObjetoFazena(obj);
         }
-        else if (obj.x > posCameraX + metadeX){
+        else if (obj.x > posNaveX + metadeX){
             obj.coluna -= colunas;
             atualizarObjetoFazena(obj);
         }
@@ -365,15 +369,18 @@ function render(time) {
 
     // --- DESENHAR O OVNI ---
     let matrizBaseOvni = m4.translation(navePos);
+    // posiciona o cone de abdução de forma que o topo fique logo abaixo da nave
+    const coneHalf = 4;
+    const worldAbducao = m4.translate(m4.translation(navePos), [0, -(coneHalf + 0.5), 0]);
     matrizBaseOvni = m4.rotateX(matrizBaseOvni, inclinacaoAtualX);  
     matrizBaseOvni = m4.rotateZ(matrizBaseOvni, inclinacaoAtualZ); 
     matrizBaseOvni = m4.rotateY(matrizBaseOvni, time * 2);
     desenharComOutline(corpoOvniBuffer,matrizBaseOvni, viewProjection, [0.6, 0.6, 0.6, 1.0]);
     desenharComOutline(anelOvniBuffer, m4.rotateZ(m4.rotateY(matrizBaseOvni, time * 4), 0.05), viewProjection, [0.1, 0.9, 0.2, 1.0]);
-
     // Cabine: transparente, sem outline (outline em objeto transparente fica estranho)
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
     const wvpCabine = m4.multiply(viewProjection, m4.translate(matrizBaseOvni, [0, 0.8, 0]));
     gl.useProgram(programInfo.program);
     setBuffersAndAttributes(gl, programInfo, cabineOvniBuffer);
@@ -384,6 +391,19 @@ function render(time) {
         u_color: [0.2, 0.8, 0.8, 0.4],
     });
     drawBufferInfo(gl, cabineOvniBuffer);
+
+    // Desenha o cone de abdução por último (transparência) e sem escrever no depth buffer
+    gl.depthMask(false);
+    gl.useProgram(programInfo.program);
+    setBuffersAndAttributes(gl, programInfo, raioAbducaoBuffer);
+    setUniforms(programInfo, {
+        u_worldViewProjection: m4.multiply(viewProjection, worldAbducao),
+        u_world: worldAbducao,
+        u_lightDirection: luzDirecao,
+        u_color: [0.8, 0.8, 0.1, 0.5 * tempoAbducao],
+    });
+    drawBufferInfo(gl, raioAbducaoBuffer);
+    gl.depthMask(true);
     gl.disable(gl.BLEND);
 
     requestAnimationFrame(render);
