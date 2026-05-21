@@ -8,10 +8,12 @@ uniform mat4 u_world;
 attribute vec4 position;
 attribute vec3 normal;
 varying vec3 v_normal;
+varying vec3 v_worldPos;
 
 void main() {
     gl_Position = u_worldViewProjection * position;
     v_normal = mat3(u_world) * normal;
+    v_worldPos = (u_world * position).xyz;
 }
 `;
 
@@ -20,8 +22,11 @@ const fsSource = `
 precision mediump float;
 
 varying vec3 v_normal;
+varying vec3 v_worldPos;
 uniform vec3 u_lightDirection;
 uniform vec4 u_color;
+uniform vec3 u_ovniPos;
+uniform float u_raioIntensidade;
 
 void main() {
     vec3 lightDir = normalize(-u_lightDirection);
@@ -33,7 +38,11 @@ void main() {
     else if (brightness > 0.55) toon = 0.7;
     else if (brightness > 0.20) toon = 0.4;
     else                        toon = 0.15;
-
+    
+    float distancia = length(v_worldPos.xz - u_ovniPos.xz);
+    float alcance = 8.0;
+    float claridade = max(0.0, 1.0 - (distancia / alcance)) * u_raioIntensidade;
+    toon = max(toon, claridade);
     gl_FragColor = vec4(u_color.rgb * toon, u_color.a);
 }
 `;
@@ -102,7 +111,6 @@ function desenharComOutline(bufferInfo, worldMatrix, viewProjection, color) {
     setUniforms(programInfo, {
         u_worldViewProjection: wvp,
         u_world: worldMatrix,
-        u_lightDirection: luzDirecao,
         u_color: color,
     });
     drawBufferInfo(gl, bufferInfo);
@@ -121,7 +129,8 @@ const cabineOvniBuffer = primitives.createSphereBufferInfo(gl, 1.5, 30, 30);
 const anelOvniBuffer = primitives.createTorusBufferInfo(gl, 3.5, 0.2, 10, 12);
 // Raio de abdução 
 const raioAbducaoBuffer = primitives.createTruncatedConeBufferInfo(gl, 3.5, 0.1, 8, 30, 1);
-
+// Sombra 
+const sombraBuffer = primitives.createDiscBufferInfo(gl, 3, 20);
 // --- OBJETOS DA FAZENDA ---
 
 // --- SILO ---
@@ -198,6 +207,14 @@ let cameraC = 0; // Variável para alternar entre as câmeras
 
 // --- CONFIGURAÇÃO DE ILUMINAÇÃO ---
 const luzDirecao = [-1.0, -0.8, -1.0]; 
+let raioAtivo = false;
+
+// Uniforms globais compartilhados por todos os draws
+const globalUniforms = {
+    u_lightDirection: luzDirecao,
+    u_ovniPos: navePos,
+    u_raioIntensidade: 0.0,
+};
 
 // --- LEITURA DE TECLAS ---
 const teclasPressionadas = {};
@@ -226,7 +243,11 @@ function render(time) {
     gl.enable(gl.DEPTH_TEST);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+    const ambientAlvo = raioAtivo ? 1.0 : 0.0;
+    globalUniforms.u_raioIntensidade += (ambientAlvo - globalUniforms.u_raioIntensidade) * deltaTime * 5;
+
     gl.useProgram(programInfo.program);
+    setUniforms(programInfo, globalUniforms);
 
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -252,7 +273,7 @@ function render(time) {
         inclinacaoAlvoZ = -0.3; // Inclina para a direita
     }
 
-    
+    globalUniforms.u_ovniPos = navePos;
     //Suavização das inclinações
     inclinacaoAtualX += (inclinacaoAlvoX - inclinacaoAtualX) * deltaTime * 5;
     inclinacaoAtualZ += (inclinacaoAlvoZ - inclinacaoAtualZ) * deltaTime * 5;
@@ -277,9 +298,16 @@ function render(time) {
         }
         teclasPressionadas['c'] = false; // Evita múltiplos incrementos por frame
     }
-    // Abdução: suaviza subida/descida enquanto a tecla Espaço é pressionada
-    const targetAbduction = teclasPressionadas[" "] ? 1 : 0;
-    tempoAbducao += (targetAbduction - tempoAbducao) * deltaTime * 5; // suaviza transição
+    if (teclasPressionadas[' '] == true){
+        tempoAbducao = 1; 
+    }
+    tempoAbducao += (-tempoAbducao) * deltaTime * 3;
+
+    //Controlar luz que o OVNI faz
+    if(tempoAbducao < 0.01){
+        raioAtivo = false;
+    } else raioAtivo = true;
+
     switch(cameraAtual){
         case 1: 
             offset = [0, 40, 0];
@@ -328,11 +356,25 @@ function render(time) {
     setBuffersAndAttributes(gl, programInfo, chaoBuffer);
     setUniforms(programInfo, {
         u_worldViewProjection: finalMatrixChao,
-        u_world: m4.identity(),
-        u_lightDirection: luzDirecao,
+        u_world: matrixChao,
         u_color: [0.3, 0.8, 0.4, 1], // Verde grama
     });
     drawBufferInfo(gl, chaoBuffer);
+    
+    // --- SOMBRA DO OVNI ---
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.useProgram(programInfo.program);
+    let matrizSombra = m4.translation([navePos[0], 0.05, navePos[2]]); // 0.01 pra não z-fight com o chão
+    setBuffersAndAttributes(gl, programInfo, sombraBuffer);
+    setUniforms(programInfo, {
+        u_worldViewProjection: m4.multiply(viewProjection, matrizSombra),
+        u_world: m4.identity(),
+        u_color: [0, 0, 0, 0.4], // preto semitransparente
+    });
+    drawBufferInfo(gl, sombraBuffer);
+    gl.disable(gl.BLEND);
+
 
     // --- DESENHAR OBJETOS ---
     const posNaveZ = navePos[2];
@@ -387,7 +429,6 @@ function render(time) {
     setUniforms(programInfo, {
         u_worldViewProjection: wvpCabine,
         u_world: m4.translate(matrizBaseOvni, [0, 0.8, 0]),
-        u_lightDirection: luzDirecao,
         u_color: [0.2, 0.8, 0.8, 0.4],
     });
     drawBufferInfo(gl, cabineOvniBuffer);
@@ -399,7 +440,6 @@ function render(time) {
     setUniforms(programInfo, {
         u_worldViewProjection: m4.multiply(viewProjection, worldAbducao),
         u_world: worldAbducao,
-        u_lightDirection: luzDirecao,
         u_color: [0.8, 0.8, 0.1, 0.5 * tempoAbducao],
     });
     drawBufferInfo(gl, raioAbducaoBuffer);
