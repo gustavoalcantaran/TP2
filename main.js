@@ -176,6 +176,43 @@ function desenharArvore(viewProjectionMatrix, posX, posZ){
     desenharComOutline(folhasBuffer,  m4.translation([posX, 3.5, posZ]), viewProjectionMatrix, [0.2,  0.8,  0.2,  1]);
 }
 
+// --- VACA ---
+const corpoVacaBuffer = primitives.createSphereBufferInfo(gl, 1.5, 4, 3);     // corpo oval low-poly
+const cabecaVacaBuffer = primitives.createSphereBufferInfo(gl, 0.7, 4, 3);    // cabeça
+const pataVacaBuffer = primitives.createCylinderBufferInfo(gl, 0.2, 1, 4, 1); // pata (reutilizada 4x)
+const raboPataBuffer = primitives.createCylinderBufferInfo(gl, 0.1, 0.8, 4, 1); // rabo
+
+function desenharVaca(viewProjectionMatrix, posX, posZ) {
+    // Corpo
+    let matrizBase = m4.translation([posX, 1.5, posZ]);
+    matrizBase = m4.rotateY(matrizBase, (pseudoRandom(posX, posZ)*Math.PI));
+
+    let matrizCorpo = m4.translate(matrizBase, [0, 1.5, 0]);
+    matrizCorpo = m4.scale(matrizCorpo, [1.5, 1, 1]);
+    desenharComOutline(corpoVacaBuffer, matrizCorpo, viewProjectionMatrix, [0.8, 0.6, 0.4, 1]); // marrom claro
+
+    // Cabeça
+    let matrizCabeca = m4.translate(matrizBase, [1.8, 1.8, 0]);
+    desenharComOutline(cabecaVacaBuffer, matrizCabeca, viewProjectionMatrix, [0.8, 0.6, 0.4, 1]);
+
+    // 4 Patas
+    const offsetsPatas = [
+        [0.8,  0.3],  // frente direita
+        [0.8, -0.3],  // frente esquerda
+        [-0.8,  0.3], // trás direita
+        [-0.8, -0.3], // trás esquerda
+    ];
+    for (let [ox, oz] of offsetsPatas) {
+        let matrizPata = m4.translate(matrizBase, [ox, 0.5, oz]);
+        desenharComOutline(pataVacaBuffer, matrizPata, viewProjectionMatrix, [0.9, 0.9, 0.9, 1]);
+    }
+
+    // Rabo
+    let matrizRabo = m4.translate(matrizBase, [-1.8, 1.5, 0]);
+    matrizRabo = m4.rotateZ(matrizRabo, 0.5);
+    desenharComOutline(raboPataBuffer, matrizRabo, viewProjectionMatrix, [0.3, 0.3, 0.3, 1]); // cinza escuro
+}
+
 // -- DISTRIBUIÇÃO HARMÔNICA (ESTILO SPORE)
 const tamanhoLote = 20;
 const colunas = 15;
@@ -204,6 +241,7 @@ function atualizarObjetoFazena(obj){
     let chance = pseudoRandom(obj.coluna+100, obj.linha+200);
     if (chance > 0.97) obj.tipo = 'silo';
     else if (chance > 0.93) obj.tipo = 'celeiro';
+    else if (chance > 0.80) obj.tipo = 'vaca';
     else obj.tipo = 'arvore';
 }
 
@@ -428,6 +466,9 @@ function render(time) {
         }
         else if (obj.tipo == 'celeiro'){
             desenharCeleiro(viewProjection, obj.x, obj.z);
+        }
+        else if (obj.tipo == 'vaca'){
+            desenharVaca(viewProjection, obj.x, obj.z);
         }
     }
 
