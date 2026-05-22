@@ -8,7 +8,11 @@
 </head>
 <body>
     <canvas id="gameCanvas"></canvas>
-
+    <audio id="backgroundMusic" src="assets/background-music.mp3" loop autoplay></audio>
+    <script>
+        const musica = document.getElementById('backgroundMusic');
+        musica.volume = 0.2;
+    </script>
     <script type="module" src="main.js"></script>
 </body>
 </html>
