@@ -169,8 +169,6 @@ const cabineOvniBuffer = primitives.createSphereBufferInfo(gl, 1.5, 30, 30);
 const anelOvniBuffer = primitives.createTorusBufferInfo(gl, 3.5, 0.2, 10, 12);
 // Raio de abdução 
 const raioAbducaoBuffer = primitives.createTruncatedConeBufferInfo(gl, 3.5, 0.1, 8, 30, 1);
-// Sombra 
-const sombraBuffer = primitives.createDiscBufferInfo(gl, 3, 20);
 // --- OBJETOS DA FAZENDA ---
 
 // --- SILO ---
@@ -512,22 +510,6 @@ function render(time) {
         u_color: [0.3, 0.8, 0.4, 1], // Verde grama
     });
     drawBufferInfo(gl, chaoBuffer);
-
-
-    // --- SOMBRA DO OVNI ---
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.useProgram(programInfo.program);
-    let matrizSombra = m4.translation([navePos[0], 0.05, navePos[2]]); // 0.01 pra não z-fight com o chão
-    setBuffersAndAttributes(gl, programInfo, sombraBuffer);
-    setUniforms(programInfo, {
-        u_worldViewProjection: m4.multiply(viewProjection, matrizSombra),
-        u_world: m4.identity(),
-        u_color: [0, 0, 0, 0.4], // preto semitransparente
-    });
-    drawBufferInfo(gl, sombraBuffer);
-    gl.disable(gl.BLEND);
-
 
     // --- DESENHAR OBJETOS ---
     const posNaveZ = navePos[2];
