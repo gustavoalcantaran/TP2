@@ -29,6 +29,7 @@ uniform vec3 u_ovniPos;
 uniform float u_raioIntensidade;
 uniform float u_iluminacaoAtiva;
 uniform float u_fogAtiva;
+uniform vec3 u_corFog;
 
 void main() {
     vec3 lightDir = normalize(-u_lightDirection);
@@ -53,7 +54,7 @@ void main() {
     float fogInicio = 100.0;
     float fogFim = 180.0;
     float fogFactor = clamp((fogFim - distanciaCamera) / (fogFim - fogInicio), 0.0, 1.0);
-    vec3 corFog = vec3(0.7, 0.8, 0.9);
+    vec3 corFog = u_corFog;
     vec3 corFinal = mix(corFog, u_color.rgb * brilhoFinal, fogFactor);
 
     gl_FragColor = vec4(mix(u_color.rgb * brilhoFinal, corFinal, u_fogAtiva), u_color.a);
@@ -61,11 +62,31 @@ void main() {
 }
 `;
 
+const vsSkybox = `
+precision mediump float;
+attribute vec4 position;
+varying vec3 v_pos;
+uniform mat4 u_viewProjection;
 
+void main(){
+    v_pos = position.xyz;
+    gl_Position = u_viewProjection * position;
+}
+`;
 
-// --- CONFIGURAÇÃO INICIAL ---
-const canvas = document.getElementById("gameCanvas");
-const gl = canvas.getContext("webgl2");
+const fsSkybox = `
+precision mediump float;
+varying vec3 v_pos;
+uniform vec3 u_corCeu;
+uniform vec3 u_corHorizonte;
+
+void main(){
+    float altura = clamp(normalize(v_pos).y, 0.0, 1.0);
+    vec3 corFinal = mix(u_corHorizonte, u_corCeu, altura);
+
+    gl_FragColor = vec4(corFinal, 1.0);
+}
+`;
 
 const vsOutline = `
 precision mediump float;
@@ -89,7 +110,12 @@ void main() {
 }
 `;
 
+// --- CONFIGURAÇÃO INICIAL ---
+const canvas = document.getElementById("gameCanvas");
+const gl = canvas.getContext("webgl2");
 const outlineProgramInfo = createProgramInfo(gl, [vsOutline, fsOutline]);
+const skyboxProgramInfo = createProgramInfo(gl, [vsSkybox, fsSkybox]);
+
 
 // Verifica se o WebGL2 está funcionando
 if (!gl) {
@@ -213,6 +239,9 @@ function desenharVaca(viewProjectionMatrix, posX, posZ) {
     desenharComOutline(raboPataBuffer, matrizRabo, viewProjectionMatrix, [0.3, 0.3, 0.3, 1]); // cinza escuro
 }
 
+// --- SKYBOX ---
+const skyboxBuffer = primitives.createSphereBufferInfo(gl, 150, 8, 6); // Esfera grande e low-poly para o céu
+
 // -- DISTRIBUIÇÃO HARMÔNICA (ESTILO SPORE)
 const tamanhoLote = 20;
 const colunas = 15;
@@ -269,8 +298,29 @@ const globalUniforms = {
     u_ovniPos: navePos,
     u_raioIntensidade: 0.0,
     u_iluminacaoAtiva : 1.0,
-    u_fogAtiva : 1.0
+    u_fogAtiva : 1.0,
+    u_corFog: [0.7, 0.8, 0.9],
 };
+
+//Tempo do dia entre 0 e 1
+let tempoDia = 0.0;
+
+function corDoDia(t) {
+    const dia   = [0.3, 0.6, 1.0];
+    const noite = [0.02, 0.02, 0.1];
+
+    // Mesmo ritmo da luzIntensidade — claro quando t=0.25, escuro quando t=0.75
+    const fator = (Math.cos((t - 0.25) * Math.PI * 2) * 0.5) + 0.5;
+    return misturarCores(noite, dia, fator);
+}
+
+function misturarCores(a,b,t){
+    return [
+        a[0] + (b[0] - a[0]) * t,
+        a[1] + (b[1] - a[1]) * t,
+        a[2] + (b[2] - a[2]) * t,
+    ]
+}
 
 // --- LEITURA DE TECLAS ---
 const teclasPressionadas = {};
@@ -290,17 +340,20 @@ function render(time) {
     time *= 0.001; // Converte o tempo para segundos
     const deltaTime = time - tempoAnterior;
     tempoAnterior = time;
-
+    tempoDia = (tempoDia + deltaTime * 0.1) % 1.0; // Ciclo de dia de 50 segundos
     
     // Ajusta o tamanho do canvas para não ficar borrado
     resizeCanvasToDisplaySize(gl.canvas);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-    
-    gl.enable(gl.DEPTH_TEST);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    gl.useProgram(programInfo.program);
-    setUniforms(programInfo, globalUniforms);
+    //Consts para controlar a cor do horizonte e a cor do céu, que mudam ao longo do dia
+    const corHorizonte = corDoDia(tempoDia);
+    const corCeu = corDoDia((tempoDia + 0.1) % 1.0);
+    globalUniforms.u_corFog = corHorizonte;
+
+    gl.enable(gl.DEPTH_TEST);
+    gl.clearColor(...corHorizonte,1.0); // Mesma cor do horizonte
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -406,6 +459,45 @@ function render(time) {
     const view = m4.inverse(camera);
     const viewProjection = m4.multiply(projection, view);
 
+    // --- DESENHAR SKYBOX ---
+
+    gl.depthMask(false);
+    gl.disable(gl.CULL_FACE);
+    const viewSemTranslacao = m4.copy(view);
+    viewSemTranslacao[12] = 0;
+    viewSemTranslacao[13] = 0;
+    viewSemTranslacao[14] = 0;
+    const viewProjectionSkybox = m4.multiply(projection, viewSemTranslacao);
+
+    let matrizSkybox = m4.translation(cameraPosition);
+    gl.useProgram(skyboxProgramInfo.program);
+    setBuffersAndAttributes(gl, skyboxProgramInfo, skyboxBuffer);
+    setUniforms(skyboxProgramInfo, {
+        u_viewProjection: viewProjectionSkybox,
+        u_corCeu: corCeu,
+        u_corHorizonte: corHorizonte,
+    });
+    drawBufferInfo(gl, skyboxBuffer);
+    gl.depthMask(true);
+
+    globalUniforms.u_lightDirection = [
+    Math.sin(tempoDia * Math.PI * 2),  // gira no eixo X
+    -Math.cos(tempoDia * Math.PI * 2), // sobe e desce
+    0.0
+    ];
+
+    globalUniforms.u_luzIntensidade = Math.max(0.0, Math.cos((tempoDia - 0.25) * Math.PI * 2));
+    gl.useProgram(programInfo.program);
+    setUniforms(programInfo, globalUniforms);
+
+
+    if (Math.floor(time) % 2 === 0) { // loga uma vez a cada 2 segundos
+    console.log(
+        'tempoDia:', tempoDia.toFixed(2),
+        'luzIntensidade:', globalUniforms.u_luzIntensidade.toFixed(2),
+        'corHorizonte:', corHorizonte.map(x => x.toFixed(2))
+    );
+    }
     // --- DESENHAR O CHÃO ---
     const tamanhoPoligono = 10;
     const chaoZ = Math.round(navePos[2]/tamanhoPoligono) * tamanhoPoligono;
@@ -420,7 +512,8 @@ function render(time) {
         u_color: [0.3, 0.8, 0.4, 1], // Verde grama
     });
     drawBufferInfo(gl, chaoBuffer);
-    
+
+
     // --- SOMBRA DO OVNI ---
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
