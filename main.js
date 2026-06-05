@@ -169,8 +169,8 @@ const cabineOvniBuffer = primitives.createSphereBufferInfo(gl, 1.5, 30, 30);
 const anelOvniBuffer = primitives.createTorusBufferInfo(gl, 3.5, 0.2, 10, 12);
 // Raio de abdução 
 const raioAbducaoBuffer = primitives.createTruncatedConeBufferInfo(gl, 3.5, 0.1, 8, 30, 1);
-// --- OBJETOS DA FAZENDA ---
 
+// --- OBJETOS DA FAZENDA ---
 // --- SILO ---
 const siloCilindroBuffer = primitives.createCylinderBufferInfo(gl,2,6,16,1);
 const siloTetoBuffer = primitives.createSphereBufferInfo(gl, 2, 16, 16);
@@ -338,7 +338,7 @@ function render(time) {
     time *= 0.001; // Converte o tempo para segundos
     const deltaTime = time - tempoAnterior;
     tempoAnterior = time;
-    tempoDia = (tempoDia + deltaTime * 0.1) % 1.0; // Ciclo de dia de 50 segundos
+    tempoDia = (tempoDia + deltaTime * 0.016) % 1.0; // Ciclo de dia de ~60 segundos
     
     // Ajusta o tamanho do canvas para não ficar borrado
     resizeCanvasToDisplaySize(gl.canvas);
@@ -487,15 +487,6 @@ function render(time) {
     globalUniforms.u_luzIntensidade = Math.max(0.0, Math.cos((tempoDia - 0.25) * Math.PI * 2));
     gl.useProgram(programInfo.program);
     setUniforms(programInfo, globalUniforms);
-
-
-    if (Math.floor(time) % 2 === 0) { // loga uma vez a cada 2 segundos
-    console.log(
-        'tempoDia:', tempoDia.toFixed(2),
-        'luzIntensidade:', globalUniforms.u_luzIntensidade.toFixed(2),
-        'corHorizonte:', corHorizonte.map(x => x.toFixed(2))
-    );
-    }
     // --- DESENHAR O CHÃO ---
     const tamanhoPoligono = 10;
     const chaoZ = Math.round(navePos[2]/tamanhoPoligono) * tamanhoPoligono;
