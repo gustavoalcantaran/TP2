@@ -279,7 +279,6 @@ const skyboxBuffer = primitives.createSphereBufferInfo(gl, 150, 8, 6); // Esfera
 const tamanhoLote = 20;
 const colunas = 15;
 const linhas = 15;
-const limiteTras = 40;
 const metadeX = (colunas * tamanhoLote) / 2;
 const metadeZ = (linhas * tamanhoLote) / 2;
 
@@ -321,20 +320,17 @@ let cameraAtual = 2;
 let cameraC = 0; // Variável para alternar entre as câmeras
 
 // --- CONFIGURAÇÃO DE ILUMINAÇÃO ---
-const luzDirecao = [-1.0, -0.8, -1.0]; 
-let raioAtivo = false;
 let iluminacaoAtiva = true;
 let fogAtiva = true;
 
 // Uniforms globais compartilhados por todos os draws
 const globalUniforms = {
-    u_lightDirection: luzDirecao,
+    u_lightDirection: [-1.0, -0.8, -1.0],
     u_ovniPos: navePos,
     u_raioIntensidade: 0.0,
     u_iluminacaoAtiva : 1.0,
     u_fogAtiva : 1.0,
     u_corFog: [0.7, 0.8, 0.9],
-    u_luzIntensidade: 1.0,
 };
 
 //Tempo do dia entre 0 e 1
@@ -344,7 +340,7 @@ function corDoDia(t) {
     const dia   = [0.3, 0.6, 1.0];
     const noite = [0.02, 0.02, 0.1];
 
-    // Mesmo ritmo da luzIntensidade — claro quando t=0.25, escuro quando t=0.75
+    //claro quando t=0.25, escuro quando t=0.75
     const fator = (Math.cos((t - 0.25) * Math.PI * 2) * 0.5) + 0.5;
     return misturarCores(noite, dia, fator);
 }
@@ -503,8 +499,6 @@ function render(time) {
     viewSemTranslacao[13] = 0;
     viewSemTranslacao[14] = 0;
     const viewProjectionSkybox = m4.multiply(projection, viewSemTranslacao);
-
-    let matrizSkybox = m4.translation(cameraPosition);
     gl.useProgram(skyboxProgramInfo.program);
     setBuffersAndAttributes(gl, skyboxProgramInfo, skyboxBuffer);
     setUniforms(skyboxProgramInfo, {
@@ -521,7 +515,6 @@ function render(time) {
     0.0
     ];
 
-    globalUniforms.u_luzIntensidade = Math.max(0.0, Math.cos((tempoDia - 0.25) * Math.PI * 2));
     gl.useProgram(programInfo.program);
     setUniforms(programInfo, globalUniforms);
     // --- DESENHAR O CHÃO ---
