@@ -210,15 +210,15 @@ function desenharVaca(viewProjectionMatrix, posX, posZ) {
     // Corpo
     let matrizBase = m4.translation([posX, 1.5, posZ]);
     matrizBase = m4.rotateY(matrizBase, (pseudoRandom(posX, posZ)*Math.PI));
-
+    
     let matrizCorpo = m4.translate(matrizBase, [0, 1.5, 0]);
     matrizCorpo = m4.scale(matrizCorpo, [1.5, 1, 1]);
     desenharComOutline(corpoVacaBuffer, matrizCorpo, viewProjectionMatrix, [0.8, 0.6, 0.4, 1]); // marrom claro
-
+    
     // Cabeça
     let matrizCabeca = m4.translate(matrizBase, [1.8, 1.8, 0]);
     desenharComOutline(cabecaVacaBuffer, matrizCabeca, viewProjectionMatrix, [0.8, 0.6, 0.4, 1]);
-
+    
     // 4 Patas
     const offsetsPatas = [
         [0.8,  0.3],  // frente direita
@@ -230,11 +230,46 @@ function desenharVaca(viewProjectionMatrix, posX, posZ) {
         let matrizPata = m4.translate(matrizBase, [ox, 0.5, oz]);
         desenharComOutline(pataVacaBuffer, matrizPata, viewProjectionMatrix, [0.9, 0.9, 0.9, 1]);
     }
-
+    
     // Rabo
     let matrizRabo = m4.translate(matrizBase, [-1.8, 1.5, 0]);
     matrizRabo = m4.rotateZ(matrizRabo, 0.5);
     desenharComOutline(raboPataBuffer, matrizRabo, viewProjectionMatrix, [0.3, 0.3, 0.3, 1]); // cinza escuro
+}
+
+// --- MOINHO ---
+const torreMoinhoBuffer = primitives.createCylinderBufferInfo(gl, 1, 5, 8, 1);
+const tetoMoinhoBuffer = primitives.createTruncatedConeBufferInfo(gl, 1.2, 0, 2, 8, 1);
+const centroPasBuffer = primitives.createSphereBufferInfo(gl, 0.4, 6, 6);
+const paBuffer = primitives.createCubeBufferInfo(gl, 1);
+
+function desenharMoinho(viewProjectionMatrix, posX, posZ, time) {
+    let matrizBase = m4.translation([posX, 0, posZ]);
+    let anguloBase = pseudoRandom(posX, posZ) * Math.PI * 2;
+    matrizBase = m4.rotateY(matrizBase, anguloBase);
+    matrizBase = m4.scale(matrizBase, [1.5, 1.5, 1.5]);
+
+    // Torre
+    let matrizTorre = m4.translate(matrizBase, [0, 2.5, 0]);
+    desenharComOutline(torreMoinhoBuffer, matrizTorre, viewProjectionMatrix, [0.8, 0.7, 0.5, 1]);
+
+    // Teto
+    let matrizTeto = m4.translate(matrizBase, [0, 6, 0]);
+    desenharComOutline(tetoMoinhoBuffer, matrizTeto, viewProjectionMatrix, [0.45, 0.45, 0.50, 1]);
+
+    // Centro das pás
+    let matrizCentro = m4.translate(matrizBase, [0, 4, 1.1]);
+    desenharComOutline(centroPasBuffer, matrizCentro, viewProjectionMatrix, [0.4, 0.4, 0.4, 1]);
+
+    // 4 Pás girando
+    const angulosPas = [0, Math.PI/2, Math.PI, Math.PI * 1.5];
+    for (let angulo of angulosPas) {
+        let matrizPa = m4.translate(matrizBase, [0, 4, 1.1]);
+        matrizPa = m4.rotateZ(matrizPa, angulo + time * 1.5); // gira com o tempo
+        matrizPa = m4.translate(matrizPa, [0, 1.2, 0]);
+        matrizPa = m4.scale(matrizPa, [0.2, 1.2, 0.1]);
+        desenharComOutline(paBuffer, matrizPa, viewProjectionMatrix, [0.6, 0.5, 0.3, 1]);
+    }
 }
 
 // --- SKYBOX ---
@@ -253,12 +288,12 @@ const objetosFazenda = [];
 for(let l = 0; l < linhas; l++){
     for(let c = 0; c < colunas; c++){
         let obj = {coluna : c, linha : l};
-        atualizarObjetoFazena(obj);
+        atualizarObjetoFazenda(obj);
         objetosFazenda.push(obj);
     }
 }
 
-function atualizarObjetoFazena(obj){
+function atualizarObjetoFazenda(obj){
 
     let desvioX = (pseudoRandom(obj.coluna, obj.linha) - 0.5) * 16;
     let desvioZ = (pseudoRandom(obj.coluna + 73, obj.linha + 42) - 0.5) * 16;
@@ -269,6 +304,7 @@ function atualizarObjetoFazena(obj){
     if (chance > 0.97) obj.tipo = 'silo';
     else if (chance > 0.93) obj.tipo = 'celeiro';
     else if (chance > 0.80) obj.tipo = 'vaca';
+    else if (chance > 0.78) obj.tipo = 'moinho';
     else obj.tipo = 'arvore';
 }
 
@@ -298,6 +334,7 @@ const globalUniforms = {
     u_iluminacaoAtiva : 1.0,
     u_fogAtiva : 1.0,
     u_corFog: [0.7, 0.8, 0.9],
+    u_luzIntensidade: 1.0,
 };
 
 //Tempo do dia entre 0 e 1
@@ -510,19 +547,19 @@ function render(time) {
         let obj = objetosFazenda[i];
         if (obj.z > posNaveZ + metadeZ){
             obj.linha += linhas;
-            atualizarObjetoFazena(obj);
+            atualizarObjetoFazenda(obj);
         }
         else if (obj.z < posNaveZ - metadeZ){
             obj.linha -= linhas;
-            atualizarObjetoFazena(obj);
+            atualizarObjetoFazenda(obj);
         }
         if(obj.x < posNaveX - metadeX){
             obj.coluna += colunas;
-            atualizarObjetoFazena(obj);
+            atualizarObjetoFazenda(obj);
         }
         else if (obj.x > posNaveX + metadeX){
             obj.coluna -= colunas;
-            atualizarObjetoFazena(obj);
+            atualizarObjetoFazenda(obj);
         }
         if (obj.tipo == 'arvore'){
             desenharArvore(viewProjection, obj.x, obj.z);
@@ -535,6 +572,9 @@ function render(time) {
         }
         else if (obj.tipo == 'vaca'){
             desenharVaca(viewProjection, obj.x, obj.z);
+        }
+        else if (obj.tipo == 'moinho'){
+            desenharMoinho(viewProjection, obj.x, obj.z, time);
         }
     }
 

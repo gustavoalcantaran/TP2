@@ -29,7 +29,7 @@ Um OVNI sobrevoando uma fazenda low-poly, desenvolvido com WebGL e TWGL.js.
 
 ## Itens Obrigatórios Implementados
 
-- Plano com cenário contendo árvores, silos, celeiros e vacas distribuídos harmonicamente
+- Plano com cenário contendo 5 tipos de objetos distribuídos harmonicamente: árvores, silos, celeiros, vacas e moinhos
 - Objeto central (OVNI) com modelagem hierárquica composta por:
   - Corpo/chassi (cone truncado)
   - Cabine com vidro semitransparente
@@ -46,7 +46,6 @@ Um OVNI sobrevoando uma fazenda low-poly, desenvolvido com WebGL e TWGL.js.
 - **Skybox (10%):** esfera com gradiente de cor envolvendo toda a cena, sincronizada com o ciclo dia/noite
 - **Neblina/Fog (4%):** efeito de névoa ativável pela tecla N, com cor sincronizada ao ciclo dia/noite
 - **Cabine com vidro semitransparente (4%):** a cúpula do OVNI é renderizada com transparência
-- **Mais tipos de objetos (8%):** 4 tipos de objetos no cenário — árvores, silos, celeiros e vacas
-- **Raio de abdução:** cone transparente com efeito de luz no chão ativado pela barra de espaço
+- **Mais tipos de objetos (4%):** 5 tipos (3 obrigatórios e 2 adicionais) de objetos no cenário — árvores, silos, celeiros , vacas e moinhos
 - **Música de fundo (3%):** trilha sonora em loop
-- **Distribuição harmônica dos objetos:** sistema procedural de geração infinita de objetos conforme o OVNI se move
+- **Raio de abdução:** cone transparente com efeito de luz no chão ativado pela barra de espaço
