@@ -27,6 +27,14 @@ Um OVNI sobrevoando uma fazenda low-poly, desenvolvido com WebGL e TWGL.js.
 
 - Gustavo Alcântara do Nascimento
 
+## Link do Trabalho Publicado
+
+- https://gustavoalcantaran.github.io/TP2/
+
+## Vídeo da Entrega 
+
+- https://youtu.be/UOAlGYhjsaA
+
 ## Itens Obrigatórios Implementados
 
 - Plano com cenário contendo 5 tipos de objetos distribuídos harmonicamente: árvores, silos, celeiros, vacas e moinhos
